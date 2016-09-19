@@ -401,8 +401,9 @@
         <option>null</option>,
         <option>tty</option>,
         <option>tty-force</option>,
-        <option>tty-fail</option> or
-        <option>socket</option>.</para>
+        <option>tty-fail</option>,
+        <option>socket</option> or
+        <option>named-descriptor</option>.</para>
 
         <para>If <option>null</option> is selected, standard input
         will be connected to <filename>/dev/null</filename>, i.e. all
@@ -440,6 +441,14 @@
         <citerefentry project='freebsd'><refentrytitle>inetd</refentrytitle><manvolnum>8</manvolnum></citerefentry>
         daemon.</para>
 
+        <para>The <option>named-descriptor</option> option connects
+        the input stream to a single file-descriptor provided by a socket unit.
+        This option requires a descriptor named <literal>StandardInput</literal>;
+        if multiple named matches are found, the first one will be used.
+        See <varname>FileDescriptorName=</varname> in
+        <citerefentry><refentrytitle>systemd.socket</refentrytitle><manvolnum>5</manvolnum></citerefentry>
+        for more details about named descriptors and ordering.</para>
+
         <para>This setting defaults to
         <option>null</option>.</para></listitem>
       </varlistentry>
@@ -456,8 +465,9 @@
         <option>kmsg</option>,
         <option>journal+console</option>,
         <option>syslog+console</option>,
-        <option>kmsg+console</option> or
-        <option>socket</option>.</para>
+        <option>kmsg+console</option>,
+        <option>socket</option> or
+        <option>named-descriptor</option>.</para>
 
         <para><option>inherit</option> duplicates the file descriptor
         of standard input for standard output.</para>
@@ -506,6 +516,14 @@
         similar to the same option of
         <varname>StandardInput=</varname>.</para>
 
+        <para>The <option>named-descriptor</option> option connects
+        the output stream to a single file-descriptor provided by a socket unit.
+        This option requires a descriptor named <literal>StandardOutput</literal>;
+        if multiple named matches are found, the first one will be used.
+        See <varname>FileDescriptorName=</varname> in
+        <citerefentry><refentrytitle>systemd.socket</refentrytitle><manvolnum>5</manvolnum></citerefentry>
+        for more details about named descriptors and ordering.</para>
+
         <para>If the standard output (or error output, see below) of a unit is connected to the journal, syslog or the
         kernel log buffer, the unit will implicitly gain a dependency of type <varname>After=</varname> on
         <filename>systemd-journald.socket</filename> (also see the automatic dependencies section above).</para>
@@ -523,9 +541,13 @@
         <listitem><para>Controls where file descriptor 2 (STDERR) of
         the executed processes is connected to. The available options
         are identical to those of <varname>StandardOutput=</varname>,
-        with one exception: if set to <option>inherit</option> the
+        with some exceptions: if set to <option>inherit</option> the
         file descriptor used for standard output is duplicated for
-        standard error. This setting defaults to the value set with
+        standard error, while <option>named-descriptor</option> requires
+        a descriptor named <literal>StandardError</literal> to which the
+        error stream will be connected.</para>
+
+        <para>This setting defaults to the value set with
         <option>DefaultStandardError=</option> in
         <citerefentry><refentrytitle>systemd-system.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
         which defaults to <option>inherit</option>. Note that setting
