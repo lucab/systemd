@@ -677,8 +677,11 @@ const sd_bus_vtable bus_exec_vtable[] = {
         SD_BUS_PROPERTY("CPUSchedulingResetOnFork", "b", bus_property_get_bool, offsetof(ExecContext, cpu_sched_reset_on_fork), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("NonBlocking", "b", bus_property_get_bool, offsetof(ExecContext, non_blocking), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("StandardInput", "s", property_get_exec_input, offsetof(ExecContext, std_input), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardInputFileDescriptorName", "s", NULL, offsetof(ExecContext, std_input_fdname), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("StandardOutput", "s", bus_property_get_exec_output, offsetof(ExecContext, std_output), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardOutputFileDescriptorName", "s", NULL, offsetof(ExecContext, std_output_fdname), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("StandardError", "s", bus_property_get_exec_output, offsetof(ExecContext, std_error), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardErrorFileDescriptorName", "s", NULL, offsetof(ExecContext, std_error_fdname), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYPath", "s", NULL, offsetof(ExecContext, tty_path), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYReset", "b", bus_property_get_bool, offsetof(ExecContext, tty_reset), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYVHangup", "b", bus_property_get_bool, offsetof(ExecContext, tty_vhangup), SD_BUS_VTABLE_PROPERTY_CONST),
@@ -1030,7 +1033,6 @@ int bus_exec_context_set_transient_property(
 
                 return 1;
 
-
         } else if (streq(name, "StandardOutput")) {
                 const char *s;
                 ExecOutput p;
@@ -1067,6 +1069,37 @@ int bus_exec_context_set_transient_property(
                         c->std_error = p;
 
                         unit_write_drop_in_private_format(u, mode, name, "StandardError=%s", exec_output_to_string(p));
+                }
+
+                return 1;
+
+        } else if (STR_IN_SET(name,
+                              "StandardInputFileDescriptorName", "StandardOutputFileDescriptorName", "StandardErrorFileDescriptorName")) {
+                const char *s;
+
+                r = sd_bus_message_read(message, "s", &s);
+                if (r < 0)
+                        return r;
+
+                if (!fdname_is_valid(s))
+                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid file descriptor name");
+
+                if (mode != UNIT_CHECK) {
+                        if (streq(name, "StandardInputFileDescriptorName")) {
+                                c->std_input = EXEC_INPUT_NAMED_FD;
+                                free_and_strdup(&c->std_input_fdname, s);
+                                unit_write_drop_in_private_format(u, mode, name, "StandardInput=fd:%s", s);
+                        }
+                        else if (streq(name, "StandardOutputFileDescriptorName")) {
+                                c->std_output = EXEC_OUTPUT_NAMED_FD;
+                                free_and_strdup(&c->std_output_fdname, s);
+                                unit_write_drop_in_private_format(u, mode, name, "StandardOutput=fd:%s", s);
+                        }
+                        else if (streq(name, "StandardErrorFileDescriptorName")) {
+                                c->std_error = EXEC_OUTPUT_NAMED_FD;
+                                free_and_strdup(&c->std_error_fdname, s);
+                                unit_write_drop_in_private_format(u, mode, name, "StandardError=fd:%s", s);
+                        }
                 }
 
                 return 1;

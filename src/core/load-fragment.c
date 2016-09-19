@@ -776,8 +776,106 @@ int config_parse_socket_bindtodevice(
         return 0;
 }
 
-DEFINE_CONFIG_PARSE_ENUM(config_parse_output, exec_output, ExecOutput, "Failed to parse output specifier");
-DEFINE_CONFIG_PARSE_ENUM(config_parse_input, exec_input, ExecInput, "Failed to parse input specifier");
+DEFINE_CONFIG_PARSE_ENUM(config_parse_input, exec_input, ExecInput, "Failed to parse input literal specifier");
+DEFINE_CONFIG_PARSE_ENUM(config_parse_output, exec_output, ExecOutput, "Failed to parse output literal specifier");
+
+int config_parse_exec_input(const char *unit,
+                       const char *filename,
+                       unsigned line,
+                       const char *section,
+                       unsigned section_line,
+                       const char *lvalue,
+                       int ltype,
+                       const char *rvalue,
+                       void *data,
+                       void *userdata) {
+        ExecContext *c = data;
+        size_t len;
+
+        assert(data);
+        assert(filename);
+        assert(line);
+        assert(rvalue);
+
+        if (startswith(rvalue, "fd:") && (len = strlen(rvalue)) > 3) {
+                // Strip prefix and validate fd name
+                _cleanup_free_ char *s;
+                s = strndup(rvalue+3, len-3);
+                if (!s)
+                        return log_oom();
+                if (!fdname_is_valid(s)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid file descriptor name, ignoring: %s", rvalue);
+                        return 0;
+                }
+                c->std_input = EXEC_INPUT_NAMED_FD;
+                free_and_strdup(&c->std_input_fdname, s);
+        } else {
+                ExecInput ei = _EXEC_INPUT_INVALID;
+                config_parse_input(unit, filename, line, section,
+                                       section_line, lvalue, ltype,
+                                       rvalue, &ei, userdata);
+                if (ei != _EXEC_INPUT_INVALID)
+                        c->std_input = ei;
+        }
+        return 0;
+}
+
+int config_parse_exec_output(const char *unit,
+                       const char *filename,
+                       unsigned line,
+                       const char *section,
+                       unsigned section_line,
+                       const char *lvalue,
+                       int ltype,
+                       const char *rvalue,
+                       void *data,
+                       void *userdata) {
+        ExecContext *c = data;
+        ExecOutput eo = _EXEC_OUTPUT_INVALID;
+        char *s = NULL;
+        size_t len;
+
+        assert(data);
+        assert(filename);
+        assert(line);
+        assert(lvalue);
+        assert(rvalue);
+
+        if (startswith(rvalue, "fd:") && (len = strlen(rvalue)) > 3) {
+                // Strip prefix and validate fd name
+                s = strndup(rvalue+3, len-3);
+                if (!s)
+                        return log_oom();
+                if (!fdname_is_valid(s)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid file descriptor name, ignoring: %s", rvalue);
+                        return 0;
+                }
+                eo = EXEC_OUTPUT_NAMED_FD;
+        } else {
+                config_parse_output(unit, filename, line, section,
+                                        section_line, lvalue, ltype,
+                                        rvalue, &eo, userdata);
+                if (eo == _EXEC_OUTPUT_INVALID)
+                        return 0;
+        }
+
+        if (streq(lvalue, "StandardOutput")) {
+                c->std_output = eo;
+                if (s) {
+                        free_and_strdup(&c->std_output_fdname, s);
+                        free(s);
+                }
+        } else if (streq(lvalue, "StandardError")) {
+                c->std_error = eo;
+                if (s) {
+                        free_and_strdup(&c->std_error_fdname, s);
+                        free(s);
+                }
+        } else {
+                log_syntax(unit, LOG_ERR, filename, line, 0, "Failed to parse output property, ignoring: %s", lvalue);
+        }
+        return 0;
+}
 
 int config_parse_exec_io_class(const char *unit,
                                const char *filename,
@@ -4189,8 +4287,8 @@ void unit_dump_config_items(FILE *f) {
                 { config_parse_exec_cpu_affinity,     "CPUAFFINITY" },
                 { config_parse_mode,                  "MODE" },
                 { config_parse_unit_env_file,         "FILE" },
-                { config_parse_output,                "OUTPUT" },
-                { config_parse_input,                 "INPUT" },
+                { config_parse_exec_output,           "OUTPUT" },
+                { config_parse_exec_input,            "INPUT" },
                 { config_parse_log_facility,          "FACILITY" },
                 { config_parse_log_level,             "LEVEL" },
                 { config_parse_exec_secure_bits,      "SECUREBITS" },
