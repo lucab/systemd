@@ -117,9 +117,6 @@ static void swap_init(Unit *u) {
 
         s->timeout_usec = u->manager->default_timeout_start_usec;
 
-        s->exec_context.std_output = u->manager->default_std_output;
-        s->exec_context.std_error = u->manager->default_std_error;
-
         s->parameters_proc_swaps.priority = s->parameters_fragment.priority = -1;
 
         s->control_command_id = _SWAP_EXEC_COMMAND_INVALID;

@@ -50,7 +50,6 @@ typedef enum ExecInput {
         EXEC_INPUT_TTY_FORCE,
         EXEC_INPUT_TTY_FAIL,
         EXEC_INPUT_SOCKET,
-        EXEC_INPUT_NAMED_FD,
         _EXEC_INPUT_MAX,
         _EXEC_INPUT_INVALID = -1
 } ExecInput;
@@ -66,7 +65,6 @@ typedef enum ExecOutput {
         EXEC_OUTPUT_JOURNAL,
         EXEC_OUTPUT_JOURNAL_AND_CONSOLE,
         EXEC_OUTPUT_SOCKET,
-        EXEC_OUTPUT_NAMED_FD,
         _EXEC_OUTPUT_MAX,
         _EXEC_OUTPUT_INVALID = -1
 } ExecOutput;
@@ -119,9 +117,9 @@ struct ExecContext {
         cpu_set_t *cpuset;
         unsigned cpuset_ncpus;
 
-        ExecInput std_input;
-        ExecOutput std_output;
-        ExecOutput std_error;
+        char *std_input;
+        char *std_output;
+        char *std_error;
 
         nsec_t timer_slack_nsec;
 
@@ -276,7 +274,7 @@ void exec_command_append_list(ExecCommand **l, ExecCommand *e);
 int exec_command_set(ExecCommand *c, const char *path, ...);
 int exec_command_append(ExecCommand *c, const char *path, ...);
 
-void exec_context_init(ExecContext *c);
+void exec_context_init(ExecContext *c, Manager *m);
 void exec_context_done(ExecContext *c);
 void exec_context_dump(ExecContext *c, FILE* f, const char *prefix);
 

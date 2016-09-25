@@ -776,8 +776,95 @@ int config_parse_socket_bindtodevice(
         return 0;
 }
 
-DEFINE_CONFIG_PARSE_ENUM(config_parse_output, exec_output, ExecOutput, "Failed to parse output specifier");
-DEFINE_CONFIG_PARSE_ENUM(config_parse_input, exec_input, ExecInput, "Failed to parse input specifier");
+DEFINE_CONFIG_PARSE_ENUM(config_parse_output_literal, exec_output, ExecOutput, "Failed to parse output literal specifier");
+DEFINE_CONFIG_PARSE_ENUM(config_parse_input_literal, exec_input, ExecInput, "Failed to parse input literal specifier");
+
+int config_parse_input(const char *unit,
+                       const char *filename,
+                       unsigned line,
+                       const char *section,
+                       unsigned section_line,
+                       const char *lvalue,
+                       int ltype,
+                       const char *rvalue,
+                       void *data,
+                       void *userdata) {
+
+        char **in = data;
+        size_t len;
+
+        assert(filename);
+        assert(lvalue);
+        assert(rvalue);
+        assert(data);
+
+        if (startswith(rvalue, "\"") && endswith(rvalue, "\"") && (len = strlen(rvalue)) > 2) {
+                // Strip enclosing quotes and validate fd name
+                _cleanup_free_ char *s;
+                s = strndup(rvalue+1, len-2);
+                if (!s)
+                        return log_oom();
+                if (!fdname_is_valid(s)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid file descriptor name, ignoring: %s", rvalue);
+                        return -EINVAL;
+                }
+                free_and_strdup(in, rvalue);
+        } else {
+                ExecInput c;
+                const char *s;
+                config_parse_input_literal(unit, filename, line, section,
+                                               section_line, lvalue, ltype,
+                                               rvalue, &c, userdata);
+                s = exec_input_to_string(c);
+                if (!s)
+                        return -EINVAL;
+                free_and_strdup(in, s);
+        }
+        return (*in ? 0 : log_oom());
+}
+
+int config_parse_output(const char *unit,
+                       const char *filename,
+                       unsigned line,
+                       const char *section,
+                       unsigned section_line,
+                       const char *lvalue,
+                       int ltype,
+                       const char *rvalue,
+                       void *data,
+                       void *userdata) {
+        char **out = data;
+        size_t len;
+
+        assert(filename);
+        assert(lvalue);
+        assert(rvalue);
+        assert(data);
+
+        if (startswith(rvalue, "\"") && endswith(rvalue, "\"") && (len = strlen(rvalue)) > 2) {
+                // Strip enclosing quotes and validate fd name
+                _cleanup_free_ char *s;
+                s = strndup(rvalue+1, len-2);
+                if (!s)
+                        return log_oom();
+                if (!fdname_is_valid(s)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid file descriptor name, ignoring: %s", rvalue);
+                        return -EINVAL;
+                }
+                free_and_strdup(out, rvalue);
+        } else {
+                ExecOutput c;
+                const char *s;
+                config_parse_output_literal(unit, filename, line, section,
+                                               section_line, lvalue, ltype,
+                                               rvalue, &c, userdata);
+                s = exec_output_to_string(c);
+                if (!s)
+                        return -EINVAL;
+                free_and_strdup(out, s);
+        }
+        return (*out ? 0 : log_oom());
+}
 
 int config_parse_exec_io_class(const char *unit,
                                const char *filename,

@@ -581,14 +581,12 @@ static void service_fix_output(Service *s) {
          * since in that case we want output to default to the same
          * place as we read input from. */
 
-        if (s->exec_context.std_error == EXEC_OUTPUT_INHERIT &&
-            s->exec_context.std_output == EXEC_OUTPUT_INHERIT &&
-            s->exec_context.std_input == EXEC_INPUT_NULL)
-                s->exec_context.std_error = UNIT(s)->manager->default_std_error;
-
-        if (s->exec_context.std_output == EXEC_OUTPUT_INHERIT &&
-            s->exec_context.std_input == EXEC_INPUT_NULL)
-                s->exec_context.std_output = UNIT(s)->manager->default_std_output;
+        if (!(s->exec_context.std_error) && !(s->exec_context.std_input))
+                s->exec_context.std_error = strdup(UNIT(s)->manager->default_std_error);
+        if (!(s->exec_context.std_output) && !(s->exec_context.std_input))
+                s->exec_context.std_output = strdup(UNIT(s)->manager->default_std_output);
+        if (!(s->exec_context.std_input))
+                s->exec_context.std_error = strdup(exec_input_to_string(EXEC_INPUT_NULL));
 }
 
 static int service_setup_bus_name(Service *s) {
@@ -1216,9 +1214,9 @@ static int service_spawn(
                 return r;
 
         if ((flags & EXEC_PASS_FDS) ||
-            s->exec_context.std_input == EXEC_INPUT_SOCKET ||
-            s->exec_context.std_output == EXEC_OUTPUT_SOCKET ||
-            s->exec_context.std_error == EXEC_OUTPUT_SOCKET) {
+            (s->exec_context.std_input && streq(s->exec_context.std_input, exec_input_to_string(EXEC_INPUT_SOCKET))) ||
+            (s->exec_context.std_output && streq(s->exec_context.std_output, exec_output_to_string(EXEC_OUTPUT_SOCKET))) ||
+            (s->exec_context.std_error && streq(s->exec_context.std_error, exec_output_to_string(EXEC_OUTPUT_SOCKET)))) {
 
                 r = service_collect_fds(s, &fds, &fd_names);
                 if (r < 0)

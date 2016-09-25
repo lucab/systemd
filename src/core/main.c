@@ -108,8 +108,8 @@ static ShowStatus arg_show_status = _SHOW_STATUS_UNSET;
 static bool arg_switched_root = false;
 static bool arg_no_pager = false;
 static char ***arg_join_controllers = NULL;
-static ExecOutput arg_default_std_output = EXEC_OUTPUT_JOURNAL;
-static ExecOutput arg_default_std_error = EXEC_OUTPUT_INHERIT;
+static char *arg_default_std_output = NULL;
+static char *arg_default_std_error = NULL;
 static usec_t arg_default_restart_usec = DEFAULT_RESTART_USEC;
 static usec_t arg_default_timeout_start_usec = DEFAULT_TIMEOUT_USEC;
 static usec_t arg_default_timeout_stop_usec = DEFAULT_TIMEOUT_USEC;
@@ -367,19 +367,15 @@ static int parse_proc_cmdline_item(const char *key, const char *value) {
 
         } else if (streq(key, "systemd.default_standard_output") && value) {
 
-                r = exec_output_from_string(value);
-                if (r < 0)
+                free_and_strdup(&arg_default_std_output, value);
+                if (!arg_default_std_output)
                         log_warning("Failed to parse default standard output switch %s. Ignoring.", value);
-                else
-                        arg_default_std_output = r;
 
         } else if (streq(key, "systemd.default_standard_error") && value) {
 
-                r = exec_output_from_string(value);
-                if (r < 0)
+                free_and_strdup(&arg_default_std_error, value);
+                if (!arg_default_std_error)
                         log_warning("Failed to parse default standard error switch %s. Ignoring.", value);
-                else
-                        arg_default_std_error = r;
 
         } else if (streq(key, "systemd.setenv") && value) {
 
@@ -732,8 +728,8 @@ static void manager_set_defaults(Manager *m) {
         assert(m);
 
         m->default_timer_accuracy_usec = arg_default_timer_accuracy_usec;
-        m->default_std_output = arg_default_std_output;
-        m->default_std_error = arg_default_std_error;
+        m->default_std_output = strdup(exec_output_to_string(EXEC_OUTPUT_JOURNAL));
+        m->default_std_error = strdup(exec_output_to_string(EXEC_OUTPUT_INHERIT));
         m->default_timeout_start_usec = arg_default_timeout_start_usec;
         m->default_timeout_stop_usec = arg_default_timeout_stop_usec;
         m->default_restart_usec = arg_default_restart_usec;
@@ -860,21 +856,19 @@ static int parse_argv(int argc, char *argv[]) {
                         break;
 
                 case ARG_DEFAULT_STD_OUTPUT:
-                        r = exec_output_from_string(optarg);
+                        r = free_and_strdup(&arg_default_std_output, optarg);
                         if (r < 0) {
                                 log_error("Failed to parse default standard output setting %s.", optarg);
                                 return r;
-                        } else
-                                arg_default_std_output = r;
+                        }
                         break;
 
                 case ARG_DEFAULT_STD_ERROR:
-                        r = exec_output_from_string(optarg);
+                        r = free_and_strdup(&arg_default_std_error, optarg);
                         if (r < 0) {
                                 log_error("Failed to parse default standard error output setting %s.", optarg);
                                 return r;
-                        } else
-                                arg_default_std_error = r;
+                        }
                         break;
 
                 case ARG_UNIT:

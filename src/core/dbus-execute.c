@@ -47,14 +47,12 @@
 #include "user-util.h"
 #include "utf8.h"
 
-BUS_DEFINE_PROPERTY_GET_ENUM(bus_property_get_exec_output, exec_output, ExecOutput);
-
-static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_exec_input, exec_input, ExecInput);
-
 static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_exec_utmp_mode, exec_utmp_mode, ExecUtmpMode);
 
 static BUS_DEFINE_PROPERTY_GET_ENUM(bus_property_get_protect_home, protect_home, ProtectHome);
 static BUS_DEFINE_PROPERTY_GET_ENUM(bus_property_get_protect_system, protect_system, ProtectSystem);
+
+
 
 static int property_get_environment_files(
                 sd_bus *bus,
@@ -676,9 +674,9 @@ const sd_bus_vtable bus_exec_vtable[] = {
         SD_BUS_PROPERTY("TimerSlackNSec", "t", property_get_timer_slack_nsec, 0, SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("CPUSchedulingResetOnFork", "b", bus_property_get_bool, offsetof(ExecContext, cpu_sched_reset_on_fork), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("NonBlocking", "b", bus_property_get_bool, offsetof(ExecContext, non_blocking), SD_BUS_VTABLE_PROPERTY_CONST),
-        SD_BUS_PROPERTY("StandardInput", "s", property_get_exec_input, offsetof(ExecContext, std_input), SD_BUS_VTABLE_PROPERTY_CONST),
-        SD_BUS_PROPERTY("StandardOutput", "s", bus_property_get_exec_output, offsetof(ExecContext, std_output), SD_BUS_VTABLE_PROPERTY_CONST),
-        SD_BUS_PROPERTY("StandardError", "s", bus_property_get_exec_output, offsetof(ExecContext, std_error), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardInput", "s", NULL, offsetof(ExecContext, std_input), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardOutput", "s", NULL, offsetof(ExecContext, std_output), SD_BUS_VTABLE_PROPERTY_CONST),
+        SD_BUS_PROPERTY("StandardError", "s", NULL, offsetof(ExecContext, std_error), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYPath", "s", NULL, offsetof(ExecContext, tty_path), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYReset", "b", bus_property_get_bool, offsetof(ExecContext, tty_reset), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("TTYVHangup", "b", bus_property_get_bool, offsetof(ExecContext, tty_vhangup), SD_BUS_VTABLE_PROPERTY_CONST),
@@ -1009,20 +1007,17 @@ int bus_exec_context_set_transient_property(
 
         } else if (streq(name, "StandardInput")) {
                 const char *s;
-                ExecInput p;
 
                 r = sd_bus_message_read(message, "s", &s);
                 if (r < 0)
                         return r;
 
-                p = exec_input_from_string(s);
-                if (p < 0)
-                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid standard input name");
-
                 if (mode != UNIT_CHECK) {
-                        c->std_input = p;
+                        free_and_strdup(&(c->std_input), s);
+                        if (!c->std_input)
+                                return -ENOMEM;
 
-                        unit_write_drop_in_private_format(u, mode, name, "StandardInput=%s", exec_input_to_string(p));
+                        unit_write_drop_in_private_format(u, mode, name, "StandardInput=%s", s);
                 }
 
                 return 1;
@@ -1030,40 +1025,34 @@ int bus_exec_context_set_transient_property(
 
         } else if (streq(name, "StandardOutput")) {
                 const char *s;
-                ExecOutput p;
 
                 r = sd_bus_message_read(message, "s", &s);
                 if (r < 0)
                         return r;
 
-                p = exec_output_from_string(s);
-                if (p < 0)
-                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid standard output name");
-
                 if (mode != UNIT_CHECK) {
-                        c->std_output = p;
+                        free_and_strdup(&(c->std_output), s);
+                        if (!c->std_output)
+                                return -ENOMEM;
 
-                        unit_write_drop_in_private_format(u, mode, name, "StandardOutput=%s", exec_output_to_string(p));
+                        unit_write_drop_in_private_format(u, mode, name, "StandardOutput=%s", s);
                 }
 
                 return 1;
 
         } else if (streq(name, "StandardError")) {
                 const char *s;
-                ExecOutput p;
 
                 r = sd_bus_message_read(message, "s", &s);
                 if (r < 0)
                         return r;
 
-                p = exec_output_from_string(s);
-                if (p < 0)
-                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid standard error name");
-
                 if (mode != UNIT_CHECK) {
-                        c->std_error = p;
+                        free_and_strdup(&(c->std_error), s);
+                        if (!c->std_error)
+                                return -ENOMEM;
 
-                        unit_write_drop_in_private_format(u, mode, name, "StandardError=%s", exec_output_to_string(p));
+                        unit_write_drop_in_private_format(u, mode, name, "StandardError=%s", s);
                 }
 
                 return 1;

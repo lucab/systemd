@@ -248,7 +248,7 @@ struct Manager {
         bool confirm_spawn;
         bool no_console_output;
 
-        ExecOutput default_std_output, default_std_error;
+        char *default_std_output, *default_std_error;
 
         usec_t default_restart_usec, default_timeout_start_usec, default_timeout_stop_usec;
 

@@ -146,7 +146,7 @@ static void unit_init(Unit *u) {
 
         ec = unit_get_exec_context(u);
         if (ec)
-                exec_context_init(ec);
+                exec_context_init(ec, u->manager);
 
         kc = unit_get_kill_context(u);
         if (kc)
@@ -856,18 +856,19 @@ int unit_add_exec_dependencies(Unit *u, ExecContext *c) {
                         return r;
         }
 
-        if (c->std_output != EXEC_OUTPUT_KMSG &&
-            c->std_output != EXEC_OUTPUT_SYSLOG &&
-            c->std_output != EXEC_OUTPUT_JOURNAL &&
-            c->std_output != EXEC_OUTPUT_KMSG_AND_CONSOLE &&
-            c->std_output != EXEC_OUTPUT_SYSLOG_AND_CONSOLE &&
-            c->std_output != EXEC_OUTPUT_JOURNAL_AND_CONSOLE &&
-            c->std_error != EXEC_OUTPUT_KMSG &&
-            c->std_error != EXEC_OUTPUT_SYSLOG &&
-            c->std_error != EXEC_OUTPUT_JOURNAL &&
-            c->std_error != EXEC_OUTPUT_KMSG_AND_CONSOLE &&
-            c->std_error != EXEC_OUTPUT_JOURNAL_AND_CONSOLE &&
-            c->std_error != EXEC_OUTPUT_SYSLOG_AND_CONSOLE)
+        if ((!c->std_output || !c->std_error) ||
+            (!streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_KMSG)) &&
+             !streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) &&
+             !streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_JOURNAL)) &&
+             !streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) &&
+             !streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)) &&
+             !streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_KMSG)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_JOURNAL)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE)) &&
+             !streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE))))
                 return 0;
 
         /* If syslog or kernel logging is requested, make sure our own

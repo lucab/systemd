@@ -166,8 +166,8 @@ static void mount_init(Unit *u) {
         } else {
                 /* The stdio/kmsg bridge socket is on /, in order to avoid a
                  * dep loop, don't use kmsg logging for -.mount */
-                m->exec_context.std_output = u->manager->default_std_output;
-                m->exec_context.std_error = u->manager->default_std_error;
+                free_and_strdup(&(m->exec_context.std_output), u->manager->default_std_output);
+                free_and_strdup(&(m->exec_context.std_error), u->manager->default_std_error);
         }
 
         /* We need to make sure that /usr/bin/mount is always called

@@ -221,19 +221,21 @@ static void exec_context_tty_reset(const ExecContext *context, const ExecParamet
                 (void) vt_disallocate(path);
 }
 
-static bool is_terminal_input(ExecInput i) {
-        return IN_SET(i,
-                      EXEC_INPUT_TTY,
-                      EXEC_INPUT_TTY_FORCE,
-                      EXEC_INPUT_TTY_FAIL);
+static bool is_terminal_input(char *i) {
+        if (!i)
+                return false;
+        return (streq(i, exec_input_to_string(EXEC_INPUT_TTY)) ||
+                streq(i, exec_input_to_string(EXEC_INPUT_TTY_FORCE)) ||
+                streq(i, exec_input_to_string(EXEC_INPUT_TTY_FAIL)));
 }
 
-static bool is_terminal_output(ExecOutput o) {
-        return IN_SET(o,
-                      EXEC_OUTPUT_TTY,
-                      EXEC_OUTPUT_SYSLOG_AND_CONSOLE,
-                      EXEC_OUTPUT_KMSG_AND_CONSOLE,
-                      EXEC_OUTPUT_JOURNAL_AND_CONSOLE);
+static bool is_terminal_output(char* o) {
+        if (!o)
+                return false;
+        return (streq(o, exec_output_to_string(EXEC_OUTPUT_TTY)) ||
+                streq(o, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)) ||
+                streq(o, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) ||
+                streq(o, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE)));
 }
 
 static bool exec_context_needs_term(const ExecContext *c) {
@@ -318,7 +320,7 @@ static int connect_journal_socket(int fd, uid_t uid, gid_t gid) {
 static int connect_logger_as(
                 Unit *unit,
                 const ExecContext *context,
-                ExecOutput output,
+                char* output,
                 const char *ident,
                 int nfd,
                 uid_t uid,
@@ -327,7 +329,6 @@ static int connect_logger_as(
         int fd, r;
 
         assert(context);
-        assert(output < _EXEC_OUTPUT_MAX);
         assert(ident);
         assert(nfd >= 0);
 
@@ -358,8 +359,8 @@ static int connect_logger_as(
                 unit->id,
                 context->syslog_priority,
                 !!context->syslog_level_prefix,
-                output == EXEC_OUTPUT_SYSLOG || output == EXEC_OUTPUT_SYSLOG_AND_CONSOLE,
-                output == EXEC_OUTPUT_KMSG || output == EXEC_OUTPUT_KMSG_AND_CONSOLE,
+                streq(output, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) || streq(output, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)),
+                streq(output, exec_output_to_string(EXEC_OUTPUT_KMSG)) || streq(output, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)),
                 is_terminal_output(output));
 
         if (fd == nfd)
@@ -389,21 +390,27 @@ static int open_terminal_as(const char *path, mode_t mode, int nfd) {
         return r;
 }
 
-static int fixup_input(ExecInput std_input, int socket_fd, bool apply_tty_stdin) {
+static const char* fixup_input(char* std_input, int socket_fd, bool apply_tty_stdin) {
+
+        if (!std_input)
+                return exec_input_to_string(EXEC_INPUT_NULL);
 
         if (is_terminal_input(std_input) && !apply_tty_stdin)
-                return EXEC_INPUT_NULL;
+                return exec_input_to_string(EXEC_INPUT_NULL);
 
-        if (std_input == EXEC_INPUT_SOCKET && socket_fd < 0)
-                return EXEC_INPUT_NULL;
+        if (streq(std_input, exec_input_to_string(EXEC_INPUT_SOCKET)) && socket_fd < 0)
+                return exec_input_to_string(EXEC_INPUT_NULL);
 
         return std_input;
 }
 
-static int fixup_output(ExecOutput std_output, int socket_fd) {
+static const char* fixup_output(char* std_output, int socket_fd) {
 
-        if (std_output == EXEC_OUTPUT_SOCKET && socket_fd < 0)
-                return EXEC_OUTPUT_INHERIT;
+        if (!std_output)
+                return exec_output_to_string(EXEC_OUTPUT_INHERIT);
+
+        if (streq(std_output, exec_output_to_string(EXEC_OUTPUT_SOCKET)) && socket_fd < 0)
+                return exec_output_to_string(EXEC_OUTPUT_INHERIT);
 
         return std_output;
 }
@@ -414,7 +421,7 @@ static int setup_input(
                 int socket_fd,
                 int *named_iofds) {
 
-        ExecInput i;
+        char *i;
 
         assert(context);
         assert(params);
@@ -424,27 +431,26 @@ static int setup_input(
                         return -errno;
 
                 /* Try to make this the controlling tty, if it is a tty, and reset it */
-                (void) ioctl(STDIN_FILENO, TIOCSCTTY, context->std_input == EXEC_INPUT_TTY_FORCE);
+                (void) ioctl(STDIN_FILENO, TIOCSCTTY, context->std_input && streq(context->std_input, exec_input_to_string(EXEC_INPUT_TTY_FORCE)));
                 (void) reset_terminal_fd(STDIN_FILENO, true);
 
                 return STDIN_FILENO;
         }
 
-        i = fixup_input(context->std_input, socket_fd, params->flags & EXEC_APPLY_TTY_STDIN);
+        i = strdup(fixup_input(context->std_input, socket_fd, params->flags & EXEC_APPLY_TTY_STDIN));
+        if (!i)
+                return -ENOMEM;
 
-        switch (i) {
-
-        case EXEC_INPUT_NULL:
+        if streq(i, exec_input_to_string(EXEC_INPUT_NULL))
                 return open_null_as(O_RDONLY, STDIN_FILENO);
-
-        case EXEC_INPUT_TTY:
-        case EXEC_INPUT_TTY_FORCE:
-        case EXEC_INPUT_TTY_FAIL: {
+        else if (streq(i, exec_input_to_string(EXEC_INPUT_TTY)) ||
+                 streq(i, exec_input_to_string(EXEC_INPUT_TTY_FORCE)) ||
+                 streq(i, exec_input_to_string(EXEC_INPUT_TTY_FAIL))) {
                 int fd, r;
 
                 fd = acquire_terminal(exec_context_tty_path(context),
-                                      i == EXEC_INPUT_TTY_FAIL,
-                                      i == EXEC_INPUT_TTY_FORCE,
+                                      streq(i, exec_input_to_string(EXEC_INPUT_TTY_FAIL)),
+                                      streq(i, exec_input_to_string(EXEC_INPUT_TTY_FORCE)),
                                       false,
                                       USEC_INFINITY);
                 if (fd < 0)
@@ -457,16 +463,12 @@ static int setup_input(
                         r = STDIN_FILENO;
 
                 return r;
-        }
-
-        case EXEC_INPUT_SOCKET:
+        } else if (streq(i, exec_input_to_string(EXEC_INPUT_SOCKET)))
                 return dup2(socket_fd, STDIN_FILENO) < 0 ? -errno : STDIN_FILENO;
-
-        case EXEC_INPUT_NAMED_FD:
+        else if (named_iofds[STDIN_FILENO] >= 0) {
                 (void) fd_nonblock(named_iofds[STDIN_FILENO], false);
                 return dup2(named_iofds[STDIN_FILENO], STDIN_FILENO) < 0 ? -errno : STDIN_FILENO;
-
-        default:
+        } else {
                 assert_not_reached("Unknown input type");
         }
 }
@@ -484,8 +486,7 @@ static int setup_output(
                 dev_t *journal_stream_dev,
                 ino_t *journal_stream_ino) {
 
-        ExecOutput o;
-        ExecInput i;
+        char *o, *i;
         int r;
 
         assert(unit);
@@ -510,37 +511,44 @@ static int setup_output(
                 return STDERR_FILENO;
         }
 
-        i = fixup_input(context->std_input, socket_fd, params->flags & EXEC_APPLY_TTY_STDIN);
-        o = fixup_output(context->std_output, socket_fd);
+        i = strdup(fixup_input(context->std_input, socket_fd, params->flags & EXEC_APPLY_TTY_STDIN));
+        if (!i)
+                return -ENOMEM;
+
+        o = strdup(fixup_output(context->std_output, socket_fd));
+        if (!o)
+                return -ENOMEM;
 
         if (fileno == STDERR_FILENO) {
-                ExecOutput e;
-                e = fixup_output(context->std_error, socket_fd);
+                char *e;
+                e = strdup(fixup_output(context->std_error, socket_fd));
+                if (!e)
+                        return -ENOMEM;
 
                 /* This expects the input and output are already set up */
 
                 /* Don't change the stderr file descriptor if we inherit all
                  * the way and are not on a tty */
-                if (e == EXEC_OUTPUT_INHERIT &&
-                    o == EXEC_OUTPUT_INHERIT &&
-                    i == EXEC_INPUT_NULL &&
-                    !is_terminal_input(context->std_input) &&
+                if (streq(e, exec_output_to_string(EXEC_OUTPUT_INHERIT)) &&
+                    streq(o, exec_output_to_string(EXEC_OUTPUT_INHERIT)) &&
+                    streq(i, exec_input_to_string(EXEC_INPUT_NULL)) &&
+                    !is_terminal_input(i) &&
                     getppid () != 1)
                         return fileno;
 
                 /* Duplicate from stdout if possible */
-                if (e == o || e == EXEC_OUTPUT_INHERIT)
+                if (streq(e, o) || streq(e, exec_output_to_string(EXEC_OUTPUT_INHERIT)))
                         return dup2(STDOUT_FILENO, fileno) < 0 ? -errno : fileno;
 
                 o = e;
 
-        } else if (o == EXEC_OUTPUT_INHERIT) {
+        } else if (streq(o, exec_output_to_string(EXEC_OUTPUT_INHERIT))) {
                 /* If input got downgraded, inherit the original value */
-                if (i == EXEC_INPUT_NULL && is_terminal_input(context->std_input))
+                if (streq(i, exec_input_to_string(EXEC_INPUT_NULL)) && is_terminal_input(i))
                         return open_terminal_as(exec_context_tty_path(context), O_WRONLY, fileno);
 
                 /* If the input is connected to anything that's not a /dev/null, inherit that... */
-                if (i != EXEC_INPUT_NULL)
+                if (!streq(i, exec_input_to_string(EXEC_INPUT_NULL)))
                         return dup2(STDIN_FILENO, fileno) < 0 ? -errno : fileno;
 
                 /* If we are not started from PID 1 we just inherit STDOUT from our parent process. */
@@ -551,24 +559,20 @@ static int setup_output(
                 return open_null_as(O_WRONLY, fileno);
         }
 
-        switch (o) {
-
-        case EXEC_OUTPUT_NULL:
+        if (streq(o, exec_output_to_string(EXEC_OUTPUT_NULL)))
                 return open_null_as(O_WRONLY, fileno);
-
-        case EXEC_OUTPUT_TTY:
+        else if (streq(o, exec_output_to_string(EXEC_OUTPUT_TTY))) {
                 if (is_terminal_input(i))
                         return dup2(STDIN_FILENO, fileno) < 0 ? -errno : fileno;
 
                 /* We don't reset the terminal if this is just about output */
                 return open_terminal_as(exec_context_tty_path(context), O_WRONLY, fileno);
-
-        case EXEC_OUTPUT_SYSLOG:
-        case EXEC_OUTPUT_SYSLOG_AND_CONSOLE:
-        case EXEC_OUTPUT_KMSG:
-        case EXEC_OUTPUT_KMSG_AND_CONSOLE:
-        case EXEC_OUTPUT_JOURNAL:
-        case EXEC_OUTPUT_JOURNAL_AND_CONSOLE:
+        } else if (streq(o, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) ||
+                   streq(o, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)) ||
+                   streq(o, exec_output_to_string(EXEC_OUTPUT_KMSG)) ||
+                   streq(o, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) ||
+                   streq(o, exec_output_to_string(EXEC_OUTPUT_JOURNAL)) ||
+                   streq(o, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE))) {
                 r = connect_logger_as(unit, context, o, ident, fileno, uid, gid);
                 if (r < 0) {
                         log_unit_error_errno(unit, r, "Failed to connect %s to the journal socket, ignoring: %m", fileno == STDOUT_FILENO ? "stdout" : "stderr");
@@ -586,17 +590,14 @@ static int setup_output(
                         }
                 }
                 return r;
-
-        case EXEC_OUTPUT_SOCKET:
+        } else if (streq(o, exec_output_to_string(EXEC_OUTPUT_SOCKET))) {
                 assert(socket_fd >= 0);
                 return dup2(socket_fd, fileno) < 0 ? -errno : fileno;
-
-        case EXEC_OUTPUT_NAMED_FD:
+        } else if (named_iofds[fileno] >= 0) {
                 (void) fd_nonblock(named_iofds[fileno], false);
                 return dup2(named_iofds[fileno], fileno) < 0 ? -errno : fileno;
-
-        default:
-                assert_not_reached("Unknown error type");
+        } else {
+                assert_not_reached("Unknown output type");
         }
 }
 
@@ -2542,10 +2543,9 @@ int exec_spawn(Unit *unit,
         assert(params);
         assert(params->fds || params->n_fds <= 0);
 
-        if (context->std_input == EXEC_INPUT_SOCKET ||
-            context->std_output == EXEC_OUTPUT_SOCKET ||
-            context->std_error == EXEC_OUTPUT_SOCKET) {
-
+        if (streq(context->std_input, exec_input_to_string(EXEC_INPUT_SOCKET)) ||
+            streq(context->std_output, exec_output_to_string(EXEC_OUTPUT_SOCKET)) ||
+            streq(context->std_error, exec_output_to_string(EXEC_OUTPUT_SOCKET))) {
                 if (params->n_fds != 1) {
                         log_unit_error(unit, "Got more than one socket.");
                         return -EINVAL;
@@ -2627,8 +2627,9 @@ int exec_spawn(Unit *unit,
         return 0;
 }
 
-void exec_context_init(ExecContext *c) {
+void exec_context_init(ExecContext *c, Manager *m) {
         assert(c);
+        assert(m);
 
         c->umask = 0022;
         c->ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_BE, 0);
@@ -2640,6 +2641,9 @@ void exec_context_init(ExecContext *c) {
         c->personality = PERSONALITY_INVALID;
         c->runtime_directory_mode = 0755;
         c->capability_bounding_set = CAP_ALL;
+        c->std_input = strdup(exec_input_to_string(EXEC_INPUT_NULL));
+        c->std_output = strdup(m->default_std_output);
+        c->std_error = strdup(m->default_std_error);
 }
 
 void exec_context_done(ExecContext *c) {
@@ -2673,6 +2677,9 @@ void exec_context_done(ExecContext *c) {
                 CPU_FREE(c->cpuset);
 
         c->utmp_id = mfree(c->utmp_id);
+        c->std_input = mfree(c->std_input);
+        c->std_output = mfree(c->std_output);
+        c->std_error = mfree(c->std_error);
         c->selinux_context = mfree(c->selinux_context);
         c->apparmor_profile = mfree(c->apparmor_profile);
 
@@ -2754,19 +2761,31 @@ static void invalid_env(const char *p, void *userdata) {
 
 int exec_context_named_iofds(Unit *unit, const ExecContext *c, const ExecParameters *p, int *named_iofds) {
         unsigned int i, targets = 0;
-        targets = (c->std_input == EXEC_INPUT_NAMED_FD) +
-                       (c->std_output == EXEC_OUTPUT_NAMED_FD) +
-                       (c->std_error == EXEC_OUTPUT_NAMED_FD);
+        _cleanup_free_ char *in = NULL, *out = NULL, *err = NULL;
+
+        if (c->std_input && startswith(c->std_input, "\"")) {
+                in = strndup(c->std_input+1, strlen(c->std_input)-2);
+                targets++;
+        }
+        if(c->std_output && startswith(c->std_output, "\"")) {
+                out = strndup(c->std_output+1, strlen(c->std_output)-2);
+                targets++;
+        }
+        if(c->std_error && startswith(c->std_error, "\"")) {
+                err = strndup(c->std_error+1, strlen(c->std_error)-2);
+                targets++;
+        }
+
         for (i = 0; i < p->n_fds && targets > 0; i++) {
-                if (named_iofds[STDIN_FILENO] < 0 && c->std_input == EXEC_INPUT_NAMED_FD && streq(p->fd_names[i], "StandardInput")) {
+                if (named_iofds[STDIN_FILENO] < 0 && in != NULL && streq(p->fd_names[i], in)) {
                         named_iofds[STDIN_FILENO] = p->fds[i];
                         targets--;
                 }
-                else if (named_iofds[STDOUT_FILENO] < 0 && c->std_output == EXEC_OUTPUT_NAMED_FD && streq(p->fd_names[i], "StandardOutput")) {
+                else if (named_iofds[STDOUT_FILENO] < 0 && out != NULL && streq(p->fd_names[i], out)) {
                         named_iofds[STDOUT_FILENO] = p->fds[i];
                         targets--;
                 }
-                else if (named_iofds[STDERR_FILENO] < 0 && c->std_error == EXEC_OUTPUT_NAMED_FD && streq(p->fd_names[i], "StandardError")) {
+                else if (named_iofds[STDERR_FILENO] < 0 && err != NULL && streq(p->fd_names[i], err)) {
                         named_iofds[STDERR_FILENO] = p->fds[i];
                         targets--;
                 }
@@ -3011,9 +3030,9 @@ void exec_context_dump(ExecContext *c, FILE* f, const char *prefix) {
                 "%sStandardInput: %s\n"
                 "%sStandardOutput: %s\n"
                 "%sStandardError: %s\n",
-                prefix, exec_input_to_string(c->std_input),
-                prefix, exec_output_to_string(c->std_output),
-                prefix, exec_output_to_string(c->std_error));
+                prefix, c->std_input,
+                prefix, c->std_output,
+                prefix, c->std_error);
 
         if (c->tty_path)
                 fprintf(f,
@@ -3026,18 +3045,18 @@ void exec_context_dump(ExecContext *c, FILE* f, const char *prefix) {
                         prefix, yes_no(c->tty_vhangup),
                         prefix, yes_no(c->tty_vt_disallocate));
 
-        if (c->std_output == EXEC_OUTPUT_SYSLOG ||
-            c->std_output == EXEC_OUTPUT_KMSG ||
-            c->std_output == EXEC_OUTPUT_JOURNAL ||
-            c->std_output == EXEC_OUTPUT_SYSLOG_AND_CONSOLE ||
-            c->std_output == EXEC_OUTPUT_KMSG_AND_CONSOLE ||
-            c->std_output == EXEC_OUTPUT_JOURNAL_AND_CONSOLE ||
-            c->std_error == EXEC_OUTPUT_SYSLOG ||
-            c->std_error == EXEC_OUTPUT_KMSG ||
-            c->std_error == EXEC_OUTPUT_JOURNAL ||
-            c->std_error == EXEC_OUTPUT_SYSLOG_AND_CONSOLE ||
-            c->std_error == EXEC_OUTPUT_KMSG_AND_CONSOLE ||
-            c->std_error == EXEC_OUTPUT_JOURNAL_AND_CONSOLE) {
+        if (streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) ||
+            streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_KMSG)) ||
+            streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_JOURNAL)) ||
+            streq(c->std_output,  exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)) ||
+            streq(c->std_output,  exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) ||
+            streq(c->std_output, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_SYSLOG)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_KMSG)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_JOURNAL)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_SYSLOG_AND_CONSOLE)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_KMSG_AND_CONSOLE)) ||
+            streq(c->std_error, exec_output_to_string(EXEC_OUTPUT_JOURNAL_AND_CONSOLE))) {
 
                 _cleanup_free_ char *fac_str = NULL, *lvl_str = NULL;
 
@@ -3623,7 +3642,6 @@ static const char* const exec_input_table[_EXEC_INPUT_MAX] = {
         [EXEC_INPUT_TTY_FORCE] = "tty-force",
         [EXEC_INPUT_TTY_FAIL] = "tty-fail",
         [EXEC_INPUT_SOCKET] = "socket",
-        [EXEC_INPUT_NAMED_FD] = "named-descriptor",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(exec_input, ExecInput);
@@ -3639,7 +3657,6 @@ static const char* const exec_output_table[_EXEC_OUTPUT_MAX] = {
         [EXEC_OUTPUT_JOURNAL] = "journal",
         [EXEC_OUTPUT_JOURNAL_AND_CONSOLE] = "journal+console",
         [EXEC_OUTPUT_SOCKET] = "socket",
-        [EXEC_OUTPUT_NAMED_FD] = "named-descriptor",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(exec_output, ExecOutput);

@@ -572,6 +572,8 @@ int manager_new(UnitFileScope scope, bool test_run, Manager **_m) {
         m->default_timer_accuracy_usec = USEC_PER_MINUTE;
         m->default_tasks_accounting = true;
         m->default_tasks_max = UINT64_MAX;
+        m->default_std_output = strdup(exec_output_to_string(EXEC_OUTPUT_JOURNAL));
+        m->default_std_error = strdup(exec_output_to_string(EXEC_OUTPUT_INHERIT));
 
 #ifdef ENABLE_EFI
         if (MANAGER_IS_SYSTEM(m) && detect_container() <= 0)
@@ -1110,6 +1112,9 @@ Manager* manager_free(Manager *m) {
 
         hashmap_free(m->uid_refs);
         hashmap_free(m->gid_refs);
+
+        free(m->default_std_output);
+        free(m->default_std_error);
 
         free(m);
         return NULL;

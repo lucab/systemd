@@ -403,7 +403,7 @@
         <option>tty-force</option>,
         <option>tty-fail</option>,
         <option>socket</option> or
-        <option>named-descriptor</option>.</para>
+        a named socket enclosed in quotes.</para>
 
         <para>If <option>null</option> is selected, standard input
         will be connected to <filename>/dev/null</filename>, i.e. all
@@ -441,9 +441,9 @@
         <citerefentry project='freebsd'><refentrytitle>inetd</refentrytitle><manvolnum>8</manvolnum></citerefentry>
         daemon.</para>
 
-        <para>The <option>named-descriptor</option> option connects
-        the input stream to a single file-descriptor provided by a socket unit.
-        This option requires a descriptor named <literal>StandardInput</literal>;
+        <para>The named descriptor option connects the input stream to
+        a single file-descriptor provided by a socket unit. The name of
+        the file-descriptor must be enclosed in quotes (e.g. <literal>"fd-name"</literal>);
         if multiple named matches are found, the first one will be used.
         See <varname>FileDescriptorName=</varname> in
         <citerefentry><refentrytitle>systemd.socket</refentrytitle><manvolnum>5</manvolnum></citerefentry>
@@ -467,7 +467,7 @@
         <option>syslog+console</option>,
         <option>kmsg+console</option>,
         <option>socket</option> or
-        <option>named-descriptor</option>.</para>
+        a named socket enclosed in quotes.</para>
 
         <para><option>inherit</option> duplicates the file descriptor
         of standard input for standard output.</para>
@@ -516,9 +516,9 @@
         similar to the same option of
         <varname>StandardInput=</varname>.</para>
 
-        <para>The <option>named-descriptor</option> option connects
-        the output stream to a single file-descriptor provided by a socket unit.
-        This option requires a descriptor named <literal>StandardOutput</literal>;
+        <para>The named descriptor option connects the output stream to
+        a single file-descriptor provided by a socket unit. The name of
+        the file-descriptor must be enclosed in quotes (e.g. <literal>"fd-name"</literal>);
         if multiple named matches are found, the first one will be used.
         See <varname>FileDescriptorName=</varname> in
         <citerefentry><refentrytitle>systemd.socket</refentrytitle><manvolnum>5</manvolnum></citerefentry>
@@ -543,9 +543,8 @@
         are identical to those of <varname>StandardOutput=</varname>,
         with some exceptions: if set to <option>inherit</option> the
         file descriptor used for standard output is duplicated for
-        standard error, while <option>named-descriptor</option> requires
-        a descriptor named <literal>StandardError</literal> to which the
-        error stream will be connected.</para>
+        standard error, while the named descriptor option will connect
+        error stream to the specified descriptor.</para>
 
         <para>This setting defaults to the value set with
         <option>DefaultStandardError=</option> in

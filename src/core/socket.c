@@ -103,9 +103,6 @@ static void socket_init(Unit *u) {
         s->ip_ttl = -1;
         s->mark = -1;
 
-        s->exec_context.std_output = u->manager->default_std_output;
-        s->exec_context.std_error = u->manager->default_std_error;
-
         s->control_command_id = _SOCKET_EXEC_COMMAND_INVALID;
 
         s->trigger_limit.interval = USEC_INFINITY;
