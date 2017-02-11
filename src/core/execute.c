@@ -3186,7 +3186,8 @@ int exec_context_named_iofds(Unit *unit, const ExecContext *c, const ExecParamet
                         named_iofds[STDIN_FILENO] = p->fds[i];
                         targets--;
 
-                } else if (named_iofds[STDOUT_FILENO] < 0 &&
+                }
+                if (named_iofds[STDOUT_FILENO] < 0 &&
                            c->std_output == EXEC_OUTPUT_NAMED_FD &&
                            stdio_fdname[STDOUT_FILENO] &&
                            streq(p->fd_names[i], stdio_fdname[STDOUT_FILENO])) {
@@ -3194,7 +3195,8 @@ int exec_context_named_iofds(Unit *unit, const ExecContext *c, const ExecParamet
                         named_iofds[STDOUT_FILENO] = p->fds[i];
                         targets--;
 
-                } else if (named_iofds[STDERR_FILENO] < 0 &&
+                }
+                if (named_iofds[STDERR_FILENO] < 0 &&
                            c->std_error == EXEC_OUTPUT_NAMED_FD &&
                            stdio_fdname[STDERR_FILENO] &&
                            streq(p->fd_names[i], stdio_fdname[STDERR_FILENO])) {
