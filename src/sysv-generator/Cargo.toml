@@ -1,0 +1,14 @@
+[package]
+name = "sysv-generator"
+version = "0.1.0"
+authors = ["Luca Bruno <lucab@debian.org>"]
+
+[dependencies]
+
+[lib]
+name = "sysv_generator_rs"
+crate-type = ["staticlib"]
+path = "sysv-generator.rs"
+
+[profile.release]
+lto = true

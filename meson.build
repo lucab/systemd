@@ -42,6 +42,18 @@ else
         rootprefixdir = rootprefixdir != '' ? rootprefixdir : '/usr'
 endif
 
+rustless = get_option('rustless')
+if rustless
+        conf.set('_rust_fn_', '')
+else
+        rustc = find_program('rustc', required : true)
+        cargo = find_program('cargo', required : true)
+        cargo_helper = find_program('tools/meson-cargo.sh', require : true)
+        conf.set('HAVE_RUST', true)
+        conf.set('_rust_fn_', 'extern')
+endif
+message('@0@ components are @1@'.format('Rust', rustless ? 'disabled' : 'enabled'))
+
 sysvinit_path = get_option('sysvinit-path')
 sysvrcnd_path = get_option('sysvrcnd-path')
 if sysvinit_path != '' or sysvrcnd_path != ''
@@ -1559,14 +1571,7 @@ if conf.get('HAVE_LIBCRYPTSETUP', false)
 endif
 
 if conf.get('HAVE_SYSV_COMPAT', false)
-        executable('systemd-sysv-generator',
-                   'src/sysv-generator/sysv-generator.c',
-                   include_directories : includes,
-                   link_with : [libshared],
-                   install_rpath : rootlibexecdir,
-                   install : true,
-                   install_dir : systemgeneratordir)
-
+        subdir('src/sysv-generator')
         executable('systemd-rc-local-generator',
                    'src/rc-local-generator/rc-local-generator.c',
                    include_directories : includes,
@@ -1830,14 +1835,7 @@ if conf.get('ENABLE_RANDOMSEED', false)
 endif
 
 if conf.get('ENABLE_FIRSTBOOT', false)
-        executable('systemd-firstboot',
-                   'src/firstboot/firstboot.c',
-                   include_directories : includes,
-                   link_with : [libshared],
-                   dependencies : [libcrypt],
-                   install_rpath : rootlibexecdir,
-                   install : true,
-                   install_dir : rootbindir)
+        subdir('src/firstboot')
 endif
 
 executable('systemd-remount-fs',

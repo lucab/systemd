@@ -57,6 +57,8 @@ static bool arg_copy_locale = false;
 static bool arg_copy_timezone = false;
 static bool arg_copy_root_password = false;
 
+_rust_fn_ void help(char*);
+
 static bool press_any_key(void) {
         char k = 0;
         bool need_nl = true;
@@ -605,32 +607,6 @@ static int process_root_password(void) {
         return 0;
 }
 
-static void help(void) {
-        printf("%s [OPTIONS...]\n\n"
-               "Configures basic settings of the system.\n\n"
-               "  -h --help                    Show this help\n"
-               "     --version                 Show package version\n"
-               "     --root=PATH               Operate on an alternate filesystem root\n"
-               "     --locale=LOCALE           Set primary locale (LANG=)\n"
-               "     --locale-messages=LOCALE  Set message locale (LC_MESSAGES=)\n"
-               "     --timezone=TIMEZONE       Set timezone\n"
-               "     --hostname=NAME           Set host name\n"
-               "     --machine-ID=ID           Set machine ID\n"
-               "     --root-password=PASSWORD  Set root password\n"
-               "     --root-password-file=FILE Set root password from file\n"
-               "     --prompt-locale           Prompt the user for locale settings\n"
-               "     --prompt-timezone         Prompt the user for timezone\n"
-               "     --prompt-hostname         Prompt the user for hostname\n"
-               "     --prompt-root-password    Prompt the user for root password\n"
-               "     --prompt                  Prompt for all of the above\n"
-               "     --copy-locale             Copy locale from host\n"
-               "     --copy-timezone           Copy timezone from host\n"
-               "     --copy-root-password      Copy root password from host\n"
-               "     --copy                    Copy locale, timezone, root password\n"
-               "     --setup-machine-id        Generate a new random machine ID\n"
-               , program_invocation_short_name);
-}
-
 static int parse_argv(int argc, char *argv[]) {
 
         enum {
@@ -689,7 +665,7 @@ static int parse_argv(int argc, char *argv[]) {
                 switch (c) {
 
                 case 'h':
-                        help();
+                        help(program_invocation_short_name);
                         return 0;
 
                 case ARG_VERSION:

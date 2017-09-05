@@ -1,0 +1,17 @@
+[package]
+name = "firstboot"
+version = "0.1.0"
+authors = ["Luca Bruno <lucab@debian.org>"]
+
+[dependencies]
+
+[lib]
+name = "firstboot_rs"
+crate-type = ["staticlib"]
+path = "firstboot.rs"
+
+[profile.release]
+lto = true
+
+[build]
+target-dir = "../../build/src/firstboot"
