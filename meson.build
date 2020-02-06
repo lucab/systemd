@@ -10,7 +10,7 @@ project('systemd', 'c',
                 'localstatedir=/var',
                 'warning_level=2',
         ],
-        meson_version : '>= 0.46',
+        meson_version : '>= 0.51',
        )
 
 libsystemd_version = '0.27.1'
@@ -1495,6 +1495,7 @@ includes = include_directories('src/basic',
                                'src/libsystemd/sd-network',
                                'src/libsystemd/sd-resolve',
                                'src/libsystemd-network',
+                               'src/rust/rshared_ffi',
                                '.')
 
 add_project_arguments('-include', 'config.h', language : 'c')
@@ -1509,6 +1510,7 @@ subdir('src/libsystemd')
 subdir('src/libsystemd-network')
 subdir('src/journal')
 subdir('src/login')
+subdir('src/rust/rshared_ffi')
 
 libjournal_core = static_library(
         'journal-core',
@@ -2210,7 +2212,7 @@ if conf.get('HAVE_SYSV_COMPAT') == 1
         executable('systemd-sysv-generator',
                    'src/sysv-generator/sysv-generator.c',
                    include_directories : includes,
-                   link_with : [libshared],
+                   link_with : [libshared, librshared_ffi],
                    install_rpath : rootlibexecdir,
                    install : true,
                    install_dir : systemgeneratordir)

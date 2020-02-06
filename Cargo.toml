@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "src/rust/rshared",
+    "src/rust/rshared_ffi",
+]
+
+[profile.release]
+lto = true

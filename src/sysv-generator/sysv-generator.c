@@ -18,6 +18,7 @@
 #include "mkdir.h"
 #include "path-lookup.h"
 #include "path-util.h"
+#include "rshared_ffi.h"
 #include "set.h"
 #include "special.h"
 #include "specifier.h"
@@ -78,26 +79,6 @@ DEFINE_TRIVIAL_CLEANUP_FUNC(SysvStub*, free_sysvstub);
 
 static void free_sysvstub_hashmapp(Hashmap **h) {
         hashmap_free_with_destructor(*h, free_sysvstub);
-}
-
-static int add_alias(const char *service, const char *alias) {
-        const char *link;
-        int r;
-
-        assert(service);
-        assert(alias);
-
-        link = prefix_roota(arg_dest, alias);
-
-        r = symlink(service, link);
-        if (r < 0) {
-                if (errno == EEXIST)
-                        return 0;
-
-                return -errno;
-        }
-
-        return 1;
 }
 
 static int generate_unit_file(SysvStub *s) {
@@ -336,7 +317,7 @@ static int handle_provides(SysvStub *s, unsigned line, const char *full_text, co
 
                 case UNIT_SERVICE:
                         log_debug("Adding Provides: alias '%s' for '%s'", m, s->name);
-                        r = add_alias(s->name, m);
+                        r = add_alias(arg_dest, s->name, m);
                         if (r < 0)
                                 log_warning_errno(r, "[%s:%u] Failed to add LSB Provides name %s, ignoring: %m", s->path, line, m);
                         break;

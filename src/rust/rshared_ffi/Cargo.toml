@@ -1,0 +1,13 @@
+[package]
+name = "rshared_ffi"
+version = "0.0.0-dev"
+authors = ["systemd developers <systemd-devel@lists.freedesktop.org>"]
+license = "LGPLv2.1+"
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rshared = { path = "../rshared/" }

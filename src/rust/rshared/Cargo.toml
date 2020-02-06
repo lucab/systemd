@@ -1,0 +1,7 @@
+[package]
+name = "rshared"
+version = "0.0.0-dev"
+authors = ["systemd developers <systemd-devel@lists.freedesktop.org>"]
+license = "LGPLv2.1+"
+edition = "2018"
+publish = false
